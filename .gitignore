@@ -1,0 +1,37 @@
+# Dependencies and generated output
+node_modules/
+dist/
+release/
+coverage/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+builder-debug.yml
+builder-effective-config.yaml
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Test media and local project data
+*.cutex.json
+*.dubcut.json
+*.mp4
+*.mov
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.m4a
+!docs/**/*.png
