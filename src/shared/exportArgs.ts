@@ -96,11 +96,11 @@ export function buildFastExportArgs(options: ExportOptions, concatListPath: stri
   return args
 }
 
-export function externalizeComplexFilter(args: string[], filterScriptPath: string): { args: string[]; filterGraph: string } {
+export function externalizeComplexFilter(args: string[], filterScriptPath: string, option = '-/filter_complex'): { args: string[]; filterGraph: string } {
   const filterIndex = args.indexOf('-filter_complex')
   const filterGraph = args[filterIndex + 1]
   if (filterIndex < 0 || !filterGraph) throw new Error('导出参数中缺少复杂滤镜。')
   const externalized = [...args]
-  externalized.splice(filterIndex, 2, '-filter_complex_script', filterScriptPath)
+  externalized.splice(filterIndex, 2, option, filterScriptPath)
   return { args: externalized, filterGraph }
 }

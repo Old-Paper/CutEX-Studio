@@ -67,7 +67,7 @@ describe('buildExportArgs', () => {
     const scriptPath = 'C:\\Temp\\cutex-filter.txt'
     const result = externalizeComplexFilter(inline, scriptPath)
     expect(result.filterGraph).toContain('concat=n=400:v=1:a=1[vout][aout]')
-    expect(result.args).toContain('-filter_complex_script')
+    expect(result.args).toContain('-/filter_complex')
     expect(result.args).toContain(scriptPath)
     expect(result.args).not.toContain(result.filterGraph)
     expect(result.args.join(' ').length).toBeLessThan(1_000)

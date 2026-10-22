@@ -7,7 +7,7 @@ import { dirname, extname, join, resolve } from 'node:path'
 import type { BrowserWindow } from 'electron'
 import type { ExportAcceleration, ExportMode, ExportOptions, ExportResult, TaskProgress } from '../../shared/types'
 import { buildConcatList, buildExportArgs, buildFastExportArgs, externalizeComplexFilter } from '../../shared/exportArgs'
-import { ffmpegPath } from '../ffmpeg/binaries'
+import { complexFilterFileOption, ffmpegPath } from '../ffmpeg/binaries'
 import { clearTaskCancellation, registerTask, wasTaskCancelled } from '../ffmpeg/taskManager'
 import { appendLog } from '../logger'
 import { exportFailureKind } from '../../shared/exportFailure'
@@ -90,7 +90,7 @@ export async function exportMedia(options: ExportOptions, logPath: string, windo
   const argsFor = async (attemptOptions: ExportOptions, mode: ExportMode): Promise<string[]> => {
     if (wasTaskCancelled(options.taskId)) throw new ExportCancelledError('导出已取消。')
     if (mode === 'fast') return buildFastExportArgs(attemptOptions, concatListPath)
-    const externalized = externalizeComplexFilter(buildExportArgs(attemptOptions), filterScriptPath)
+    const externalized = externalizeComplexFilter(buildExportArgs(attemptOptions), filterScriptPath, await complexFilterFileOption())
     if (!preciseScriptReady) {
       await writeFile(filterScriptPath, externalized.filterGraph, 'utf8')
       preciseScriptReady = true
