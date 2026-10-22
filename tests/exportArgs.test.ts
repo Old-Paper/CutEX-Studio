@@ -78,6 +78,8 @@ describe('buildExportArgs', () => {
     expect(list).toContain("file 'C:/素材 文件/配音.mp4'")
     expect(list).toContain('inpoint 2.000')
     expect(args).toContain('-segment_time_metadata')
+    expect(args).toContain('-copyts')
+    expect(args.join(' ')).toContain('min_hard_comp=0.001')
     expect(args).toContain('select=concatdec_select,setpts=PTS-STARTPTS')
     expect(args).toContain('h264_nvenc')
     expect(args.join(' ')).not.toContain('trim=start=')

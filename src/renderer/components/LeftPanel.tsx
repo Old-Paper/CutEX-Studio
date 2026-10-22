@@ -39,7 +39,7 @@ export function LeftPanel(): JSX.Element {
       <section className="panel-section parameters">
         <div className="section-title"><SlidersHorizontal size={15} />剪辑节奏<button className="icon-btn" title="恢复中等节奏" onClick={() => applyPreset('balanced')}><RotateCcw size={14} /></button></div>
         <div className="preset-grid">
-          <button className={activePreset === 'fast' ? 'active' : ''} onClick={() => applyPreset('fast')}><Zap size={14} /><b>快</b><span>阈值下全去除</span></button>
+          <button className={activePreset === 'fast' ? 'active' : ''} onClick={() => applyPreset('fast')}><Zap size={14} /><b>快</b><span>长静音不留边</span></button>
           <button className={activePreset === 'balanced' ? 'active' : ''} onClick={() => applyPreset('balanced')}><Gauge size={14} /><b>中</b><span>前后保留 4 帧</span></button>
           <button className={activePreset === 'gentle' ? 'active' : ''} onClick={() => applyPreset('gentle')}><Feather size={14} /><b>慢</b><span>前后保留 8 帧</span></button>
         </div>
@@ -48,7 +48,7 @@ export function LeftPanel(): JSX.Element {
           <span>{field.label}<small>{parameters[field.key]} {field.unit}</small></span>
           <input type="range" min={field.min} max={field.max} step={field.step} value={parameters[field.key]} onChange={(event) => setParameter(field.key, Number(event.target.value))} />
         </label>)}
-        <div className="parameter-subtitle"><small>1 秒及以下的静音不会标记或删除</small></div>
+        <div className="parameter-subtitle"><small>原始静音 ≤1 秒不自动裁剪；手动标记不受限制。重新粗剪保留手动决定，可撤销。</small></div>
       </section>
       <div className="privacy-note"><span className="privacy-dot" />全部处理均在本机完成，不上传媒体</div>
     </aside>

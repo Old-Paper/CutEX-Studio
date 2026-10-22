@@ -20,7 +20,13 @@ export function Timeline(): JSX.Element {
   const duration = media?.durationMs ?? 1
   const keepRanges = deletionToKeepRanges(enabledDeletions(ranges), duration)
   const overviewCuts = mergeRanges(enabledDeletions(ranges), 0, duration)
-  const ticks = Array.from({ length: 11 }, (_, index) => index / 10 * duration)
+  const tickStep = Math.max(100, 10 ** Math.floor(Math.log10(duration / zoom / 8)))
+  const firstTick = Math.ceil(viewportWindow.left * duration / tickStep) * tickStep
+  const ticks = Array.from({ length: Math.min(100, Math.ceil(duration * viewportWindow.width / tickStep) + 1) }, (_, index) => firstTick + index * tickStep).filter((time) => time <= duration)
+  const viewportPixels = viewportRef.current?.clientWidth ?? 1200
+  const msPerPixel = duration * viewportWindow.width / viewportPixels
+  const visibleRanges = ranges.filter((range) => range.endMs >= viewportWindow.left * duration && range.startMs <= (viewportWindow.left + viewportWindow.width) * duration)
+  const compactCuts = mergeRanges(enabledDeletions(visibleRanges), msPerPixel, duration)
 
   const syncViewportWindow = useCallback((): void => {
     const viewport = viewportRef.current
@@ -43,6 +49,15 @@ export function Timeline(): JSX.Element {
   }, [zoom, media?.path, syncViewportWindow])
 
   useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const viewport = viewportRef.current
+      if (viewport && media) viewport.scrollLeft = useEditorStore.getState().playheadMs / media.durationMs * viewport.scrollWidth - viewport.clientWidth / 2
+      syncViewportWindow()
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [media, syncViewportWindow])
+
+  useEffect(() => {
     const viewport = viewportRef.current
     if (!viewport || !media?.path) return
     const onWheel = (event: WheelEvent): void => {
@@ -54,7 +69,8 @@ export function Timeline(): JSX.Element {
         const rect = viewport.getBoundingClientRect()
         const cursorX = Math.min(rect.width, Math.max(0, event.clientX - rect.left))
         const timeRatio = (viewport.scrollLeft + cursorX) / Math.max(1, viewport.scrollWidth)
-        const nextZoom = Math.min(12, Math.max(1, state.zoom * Math.exp(-delta * 0.0015)))
+        const unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.clientWidth : 1
+        const nextZoom = Math.min(256, Math.max(1, state.zoom * Math.exp(-delta * unit * 0.0015)))
         state.setZoom(nextZoom)
         requestAnimationFrame(() => {
           viewport.scrollLeft = timeRatio * viewport.scrollWidth - cursorX
@@ -67,7 +83,7 @@ export function Timeline(): JSX.Element {
       const delta = Math.abs(event.deltaX) > Math.abs(event.deltaY) ? event.deltaX : event.deltaY
       if (!delta) return
       event.preventDefault()
-      viewport.scrollLeft += delta
+      viewport.scrollLeft += delta * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? viewport.clientWidth : 1)
     }
     viewport.addEventListener('wheel', onWheel, { passive: false })
     return () => viewport.removeEventListener('wheel', onWheel)
@@ -138,8 +154,11 @@ export function Timeline(): JSX.Element {
       const raw = (edge === 'left' ? initial.startMs : initial.endMs) + (move.clientX - startX) / width * duration
       const targets = [state.playheadMs, 0, duration, ...state.rangeHistory.present.filter((range) => range.id !== id).flatMap((range) => [range.startMs, range.endMs])]
       const snapped = snapTime(raw, targets, 8 / width * duration, duration)
-      const startMs = edge === 'left' ? Math.min(snapped, live.endMs - 10) : live.startMs
-      const endMs = edge === 'right' ? Math.max(snapped, live.startMs + 10) : live.endMs
+      const others = state.rangeHistory.present.filter((range) => range.id !== id)
+      const lower = Math.max(0, ...others.filter((range) => range.endMs <= initial.startMs).map((range) => range.endMs))
+      const upper = Math.min(duration, ...others.filter((range) => range.startMs >= initial.endMs).map((range) => range.startMs))
+      const startMs = edge === 'left' ? Math.max(lower, Math.min(snapped, live.endMs - 10)) : live.startMs
+      const endMs = edge === 'right' ? Math.min(upper, Math.max(snapped, live.startMs + 10)) : live.endMs
       state.previewRange(id, Math.max(0, startMs), Math.min(duration, endMs))
       setDragLabel({ x: move.clientX, time: edge === 'left' ? startMs : endMs })
     }
@@ -207,15 +226,16 @@ export function Timeline(): JSX.Element {
     <div className="timeline-toolbar">
       <div className="timeline-title"><b>粗剪时间轴</b><span>{ranges.length ? `${ranges.length} 个停顿区间 · 滚轮横移 · Alt+滚轮缩放` : '单轨 · 毫秒精度'}</span></div>
       <div className="edit-tools"><button className="icon-btn" title="撤销 Ctrl+Z" onClick={() => useEditorStore.getState().undo()}><Undo2 size={15} /></button><button className="icon-btn" title="重做 Ctrl+Shift+Z" onClick={() => useEditorStore.getState().redo()}><Redo2 size={15} /></button><span /><button className="tool-button" title="在播放头处分割 S" onClick={() => useEditorStore.getState().splitSelected()}><Scissors size={14} />分割</button></div>
-      <div className="zoom-tools"><ZoomIn size={14} /><button className="icon-btn" onClick={() => changeZoom(zoom / 1.25)}><Minus size={14} /></button><input aria-label="时间轴缩放" type="range" min="1" max="12" step="0.25" value={zoom} onChange={(event) => changeZoom(Number(event.target.value))} /><button className="icon-btn" onClick={() => changeZoom(zoom * 1.25)}><Plus size={14} /></button><span>{Math.round(zoom * 100)}%</span></div>
+      <div className="zoom-tools"><ZoomIn size={14} /><button className="icon-btn" onClick={() => changeZoom(zoom / 1.25)}><Minus size={14} /></button><input aria-label="时间轴缩放" type="range" min="0" max="8" step="0.05" value={Math.log2(zoom)} onChange={(event) => changeZoom(2 ** Number(event.target.value))} /><button className="icon-btn" onClick={() => changeZoom(zoom * 1.25)}><Plus size={14} /></button><span>{Math.round(zoom * 100)}%</span></div>
     </div>
     <div className="timeline-viewport" ref={viewportRef} onScroll={syncViewportWindow}>
       <div className="timeline-track" ref={trackRef} style={{ width: `${zoom * 100}%` }} onPointerDown={startScrub}>
-        <div className="ruler">{ticks.map((tick) => <span key={tick} style={{ left: `${tick / duration * 100}%` }}><i />{formatTime(tick, false)}</span>)}</div>
+        <div className="ruler">{ticks.map((tick) => <span key={tick} style={{ left: `${tick / duration * 100}%` }}><i />{formatTime(tick, tickStep < 1000)}</span>)}</div>
         <div className="track-label">VOICE 01{isWaveformLoading ? ' · 计算波形…' : waveform ? ' · 真实峰值' : ''}</div>
-        <WaveformCanvas waveform={waveform} loading={isWaveformLoading} />
+        <WaveformCanvas waveform={waveform} loading={isWaveformLoading} viewport={viewportWindow} />
         {keepRanges.map((range) => <div key={range.id} className="keep-overlay" style={{ left: `${range.startMs / duration * 100}%`, width: `${(range.endMs - range.startMs) / duration * 100}%` }} />)}
-        {ranges.map((range) => <div key={range.id} className={`cut-segment ${range.enabled ? 'enabled' : 'restored'} ${selectedIds.includes(range.id) ? 'selected' : ''}`} style={{ left: `${range.startMs / duration * 100}%`, width: `${(range.endMs - range.startMs) / duration * 100}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); useEditorStore.getState().selectRange(range.id, event.shiftKey ? 'extend' : (event.ctrlKey || event.metaKey) ? 'toggle' : 'single'); useEditorStore.getState().setPlayhead(range.startMs) }}>
+        {compactCuts.map((range) => <div key={range.id} className="cut-fill" style={{ left: `${range.startMs / duration * 100}%`, width: `${(range.endMs - range.startMs) / duration * 100}%` }} />)}
+        {visibleRanges.map((range) => <div key={range.id} className={`cut-segment ${range.enabled ? 'enabled' : 'restored'} ${selectedIds.includes(range.id) ? 'selected' : ''}`} style={{ left: `${range.startMs / duration * 100}%`, width: `${(range.endMs - range.startMs) / duration * 100}%` }} onPointerDown={(event) => { if (event.target === event.currentTarget) startScrub(event) }} onClick={(event) => { event.stopPropagation(); useEditorStore.getState().selectRange(range.id, event.shiftKey ? 'extend' : (event.ctrlKey || event.metaKey) ? 'toggle' : 'single') }}>
           <button className="edge left" aria-label="调整开始时间" onPointerDown={(event) => startDrag(event, range.id, 'left')} onClick={(event) => event.stopPropagation()} /><span className="cut-stripes" /><button className="edge right" aria-label="调整结束时间" onPointerDown={(event) => startDrag(event, range.id, 'right')} onClick={(event) => event.stopPropagation()} />
         </div>)}
         <div className="playhead" style={{ left: `${playheadMs / duration * 100}%` }}><span /><i /></div>

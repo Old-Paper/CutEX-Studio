@@ -4,9 +4,10 @@ import type { WaveformData } from '../../shared/types'
 interface Props {
   waveform: WaveformData | null
   loading: boolean
+  viewport: { left: number; width: number }
 }
 
-export function WaveformCanvas({ waveform, loading }: Props): JSX.Element {
+export function WaveformCanvas({ waveform, loading, viewport }: Props): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   useEffect(() => {
@@ -26,21 +27,17 @@ export function WaveformCanvas({ waveform, loading }: Props): JSX.Element {
       context.fillStyle = 'rgba(116, 126, 143, .28)'
       context.fillRect(0, Math.floor(center), width, 1)
 
-      const peaks = waveform?.peaks ?? []
-      const rms = waveform?.rms ?? []
+      const available = waveform ? [waveform, ...(waveform.levels ?? [])] : []
+      const level = [...available].reverse().find((item) => item.peaks.length * viewport.width >= width) ?? waveform
+      const peaks = level?.peaks ?? []
+      const rms = level?.rms ?? []
       if (!peaks.length) {
-        context.strokeStyle = loading ? 'rgba(139,124,255,.32)' : 'rgba(104,113,128,.28)'
-        context.lineWidth = Math.max(1, ratio)
-        for (let x = 0; x < width; x += Math.max(4, Math.round(5 * ratio))) {
-          const amplitude = 0.12 + ((x * 17) % 31) / 100
-          context.beginPath(); context.moveTo(x, center * (1 - amplitude)); context.lineTo(x, center * (1 + amplitude)); context.stroke()
-        }
         return
       }
 
       const sampleAt = (values: number[], x: number): number => {
-        const start = Math.floor(x / width * values.length)
-        const end = Math.max(start + 1, Math.ceil((x + 1) / width * values.length))
+        const start = Math.floor((viewport.left + x / width * viewport.width) * values.length)
+        const end = Math.max(start + 1, Math.ceil((viewport.left + (x + 1) / width * viewport.width) * values.length))
         let maximum = 0
         for (let index = start; index < Math.min(values.length, end); index += 1) maximum = Math.max(maximum, values[index] ?? 0)
         return maximum
@@ -66,7 +63,7 @@ export function WaveformCanvas({ waveform, loading }: Props): JSX.Element {
       context.lineWidth = Math.max(1, ratio * .72)
       const step = Math.max(1, Math.round(ratio))
       for (let x = 0; x < width; x += step) {
-        const value = Math.max(.015, sampleAt(peaks, x))
+        const value = sampleAt(peaks, x)
         context.beginPath(); context.moveTo(x, center - value * center * .94); context.lineTo(x, center + value * center * .94); context.stroke()
       }
       context.globalAlpha = 1
@@ -75,7 +72,7 @@ export function WaveformCanvas({ waveform, loading }: Props): JSX.Element {
     observer.observe(canvas)
     draw()
     return () => observer.disconnect()
-  }, [waveform, loading])
+  }, [waveform, loading, viewport])
 
-  return <div className="waveform waveform-accurate"><canvas ref={canvasRef} aria-label={loading ? '正在生成真实音频波形' : '真实音频波形'} /></div>
+  return <div className="waveform waveform-accurate" style={{ left: `${viewport.left * 100}%`, width: `${viewport.width * 100}%`, right: 'auto' }}><canvas ref={canvasRef} aria-label={loading ? '正在生成真实音频波形' : '真实音频波形'} /></div>
 }

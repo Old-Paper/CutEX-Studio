@@ -3,6 +3,7 @@ node_modules/
 dist/
 release/
 coverage/
+.qa/
 
 # Local configuration and secrets
 .env

@@ -7,6 +7,9 @@ export interface TimeRange {
 export interface DeletionRange extends TimeRange {
   enabled: boolean
   source: 'detected' | 'manual'
+  /** Original footprint of an edited suggestion, including restored edges. */
+  overrideStartMs?: number
+  overrideEndMs?: number
 }
 
 export interface AudioTrack {
@@ -71,6 +74,7 @@ export interface WaveformData {
   peaks: number[]
   rms: number[]
   sampleRate: number
+  levels?: { peaks: number[]; rms: number[] }[]
 }
 
 export interface ExportOptions {
@@ -136,4 +140,9 @@ export interface DesktopApi {
   revealFile(path: string): Promise<void>
   toMediaUrl(path: string): string
   onTaskProgress(callback: (progress: TaskProgress) => void): () => void
+  confirmReplace(): Promise<'save' | 'discard' | 'cancel'>
+  saveRecovery(project: ProjectData | null): Promise<void>
+  recoverProject(): Promise<ProjectOpenResult | null>
+  environmentStatus(): Promise<{ ready: boolean; details: string }>
+  previewPath(media: MediaInfo, streamIndex: number | null): Promise<string>
 }

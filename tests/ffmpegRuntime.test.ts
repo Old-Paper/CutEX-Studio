@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { mkdir, readdir, stat } from 'node:fs/promises'
+import { beforeAll, describe, expect, it } from 'vitest'
+import { mkdir, mkdtemp, readdir, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -11,9 +11,19 @@ import { exportMedia } from '../src/main/export/exportMedia'
 import { detectHardwareEncoders } from '../src/main/ffmpeg/hardwareEncoders'
 import { probeMedia } from '../src/main/ffprobe/probe'
 
-const mediaPath = process.env.CUTEX_QA_MEDIA ?? process.env.DUBCUT_QA_MEDIA
-const outputDirectory = process.env.CUTEX_QA_OUTPUT ?? process.env.DUBCUT_QA_OUTPUT
-const runtime = describe.runIf(Boolean(mediaPath && outputDirectory))
+let mediaPath = process.env.CUTEX_QA_MEDIA ?? process.env.DUBCUT_QA_MEDIA
+let outputDirectory: string
+const runtime = describe
+
+beforeAll(async () => {
+  outputDirectory = await mkdtemp(join(tmpdir(), 'cutex-runtime-'))
+  if (!mediaPath) {
+    mediaPath = join(outputDirectory, '测试素材.mp4')
+    await runFfmpeg(['-v', 'error', '-f', 'lavfi', '-i', 'testsrc2=size=320x180:rate=25:duration=3',
+      '-f', 'lavfi', '-i', 'aevalsrc=if(between(t\\,1\\,2)\\,0\\,0.3*sin(2*PI*440*t)):s=48000:d=3',
+      '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-y', mediaPath])
+  }
+}, 30000)
 
 function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -123,7 +133,7 @@ runtime('real FFmpeg processing', () => {
 })
 
 const longMediaPath = process.env.CUTEX_LONG_QA_MEDIA ?? process.env.DUBCUT_LONG_QA_MEDIA
-describe.runIf(Boolean(longMediaPath && outputDirectory))('long media fast export benchmark', () => {
+describe.runIf(Boolean(longMediaPath))('optional long media fast export benchmark', () => {
   it('handles 762 distributed cuts without constructing 1524 trim branches', async () => {
     await mkdir(outputDirectory!, { recursive: true })
     const media = await probeMedia(longMediaPath!)

@@ -4,6 +4,7 @@ import { useEditorStore } from '../stores/editorStore'
 export function Header(): JSX.Element {
   const media = useEditorStore((state) => state.media)
   const task = useEditorStore((state) => state.task)
+  const isDirty = useEditorStore((state) => state.isDirty)
   const hasRoughCut = useEditorStore((state) => state.rawSilences.length > 0 || state.rangeHistory.present.length > 0)
   const { newProject, importMedia, openProject, saveProject, analyze, openExportDialog } = useEditorStore.getState()
   return (
@@ -13,7 +14,7 @@ export function Header(): JSX.Element {
         <button className="btn ghost" onClick={newProject}><FilePlus2 size={16} />新建</button>
         <button className="btn ghost" onClick={() => void importMedia()}><FilePlus2 size={16} />导入媒体</button>
         <button className="btn ghost" onClick={() => void openProject()}><FolderOpen size={16} />打开项目</button>
-        <button className="btn ghost" disabled={!media} onClick={() => void saveProject()}><Save size={16} />保存</button>
+        <button className="btn ghost" disabled={!media} onClick={() => void saveProject()}><Save size={16} />{isDirty ? '保存 · 未保存' : '保存'}</button>
         <button className="icon-btn save-as" title="另存为" disabled={!media} onClick={() => void saveProject(true)}><SaveAll size={15} /></button>
         <span className="top-divider" />
         <button className="btn secondary" disabled={!media?.hasAudio || Boolean(task)} onClick={() => void analyze()}><Sparkles size={16} />{hasRoughCut ? '重新粗剪' : '智能粗剪'}</button>

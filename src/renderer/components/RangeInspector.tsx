@@ -16,7 +16,7 @@ export function RangeInspector(): JSX.Element {
   const setSelectedEnabled = useEditorStore((state) => state.setSelectedEnabled)
   const cutMs = ranges.filter((range) => range.enabled).reduce((sum, range) => sum + range.endMs - range.startMs, 0)
   return <aside className="panel right-panel">
-    <div className="inspector-head"><div><div className="section-title"><Scissors size={15} />建议删除</div><p>{ranges.length ? `${ranges.filter((range) => range.enabled).length} 个将在播放和导出时跳过` : '等待静音检测'}</p></div>{ranges.length > 0 && <span className="saved-time">-{formatTime(cutMs, false)}</span>}</div>
+    <div className="inspector-head"><div><div className="section-title"><Scissors size={15} />建议删除</div><p>{ranges.length ? `${ranges.filter((range) => range.enabled).length} 个将在成片预览和导出时跳过` : '等待静音检测'}</p></div>{ranges.length > 0 && <span className="saved-time">-{formatTime(cutMs, false)}</span>}</div>
     {ranges.length > 0 && <div className="batch-actions"><button onClick={selectAll}>全选</button><button onClick={clearSelection}>取消</button><button onClick={invertSelection}>反选</button><button title="恢复所有区间" onClick={() => setAllEnabled(false)}><RotateCcw size={13} /></button></div>}
     {selectedIds.length > 0 && <div className="selection-actions"><button onClick={() => setSelectedEnabled(true)}>删除所选</button><button onClick={() => setSelectedEnabled(false)}>保留所选</button></div>}
     <div className="range-list">

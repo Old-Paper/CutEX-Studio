@@ -11,8 +11,10 @@ function AudioArtwork(): JSX.Element {
 
 export function Preview(): JSX.Element {
   const media = useEditorStore((state) => state.media)
+  const selectedAudioStream = useEditorStore((state) => state.selectedAudioStream)
   const playheadMs = useEditorStore((state) => state.playheadMs)
   const isPlaying = useEditorStore((state) => state.isPlaying)
+  const previewMode = useEditorStore((state) => state.previewMode)
   const activeCutCount = useEditorStore((state) => state.rangeHistory.present.filter((range) => range.enabled).length)
   const setPlayhead = useEditorStore((state) => state.setPlayhead)
   const setPlaying = useEditorStore((state) => state.setPlaying)
@@ -21,6 +23,15 @@ export function Preview(): JSX.Element {
   const ref = useRef<HTMLVideoElement & HTMLAudioElement>(null)
   const pendingSeekRef = useRef<number | null>(null)
   const [previewError, setPreviewError] = useState(false)
+  const [source, setSource] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    setPreviewError(false); pendingSeekRef.current = null; setSource(null)
+    if (media) void window.desktop.previewPath(media, selectedAudioStream)
+      .then((path) => { if (active) setSource(path) })
+      .catch((error: unknown) => { if (active) { setPreviewError(true); useEditorStore.getState().setError(String(error)) } })
+    return () => { active = false }
+  }, [media, selectedAudioStream])
 
   useEffect(() => {
     const player = ref.current
@@ -28,7 +39,7 @@ export function Preview(): JSX.Element {
     if (!isPlaying) return player.pause()
     const state = useEditorStore.getState()
     const durationMs = state.media?.durationMs ?? 0
-    const skipTarget = findPlaybackSkipTarget(state.playheadMs, state.rangeHistory.present, durationMs)
+    const skipTarget = state.previewMode === 'edited' ? findPlaybackSkipTarget(state.playheadMs, state.rangeHistory.present, durationMs) : null
     if (skipTarget !== null) {
       if (skipTarget >= durationMs) return setPlaying(false)
       pendingSeekRef.current = skipTarget
@@ -36,7 +47,7 @@ export function Preview(): JSX.Element {
       state.setPlayhead(skipTarget)
     }
     void player.play().catch(() => setPlaying(false))
-  }, [isPlaying, setPlaying])
+  }, [isPlaying, setPlaying, source])
 
   useEffect(() => {
     const player = ref.current
@@ -52,7 +63,7 @@ export function Preview(): JSX.Element {
       const player = ref.current
       const state = useEditorStore.getState()
       if (player && state.isPlaying && !state.isScrubbing) {
-        const skipTarget = findPlaybackSkipTarget(player.currentTime * 1000, state.rangeHistory.present, media.durationMs)
+        const skipTarget = state.previewMode === 'edited' ? findPlaybackSkipTarget(player.currentTime * 1000, state.rangeHistory.present, media.durationMs) : null
         if (skipTarget !== null && pendingSeekRef.current !== skipTarget) {
           if (skipTarget >= media.durationMs) {
             player.pause()
@@ -77,7 +88,7 @@ export function Preview(): JSX.Element {
 
   const common = {
     ref,
-    src: window.desktop.toMediaUrl(media.path),
+    src: source ? window.desktop.toMediaUrl(source) : undefined,
     onLoadedMetadata: () => {
       const player = ref.current
       if (!player) return
@@ -103,8 +114,12 @@ export function Preview(): JSX.Element {
   }
   return <main className="preview">
     <div className="stage">
-      {media.hasVideo && !previewError ? <video className="video-player" {...common} /> : media.hasAudio && !previewError ? <><AudioArtwork /><audio {...common} /></> : <div className="preview-error"><FileVideo2 size={34} /><b>此编码暂不支持直接预览</b><span>仍可正常分析与导出，建议使用 H.264 / AAC 预览源。</span></div>}
-      <div className="stage-badge">{activeCutCount ? `粗剪预览 · 自动跳过 ${activeCutCount} 处` : '原始媒体预览'}</div>
+      {!source && !previewError ? <div className="preview-error">正在准备所选音轨预览…</div> : media.hasVideo && !previewError ? <video className="video-player" {...common} /> : media.hasAudio && !previewError ? <><AudioArtwork /><audio {...common} /></> : <div className="preview-error"><FileVideo2 size={34} /><b>此编码暂不支持直接预览</b><span>仍可正常分析与导出，建议使用 H.264 / AAC 预览源。</span></div>}
+      <div className="stage-badge">{previewMode === 'edited' ? `成片预览 · 跳过 ${activeCutCount} 处` : '原片校对 · 播放所有内容'}</div>
+      <div className="preview-mode" role="group" aria-label="试听模式">
+        <button className={`btn ${previewMode === 'original' ? 'primary' : 'secondary'}`} onClick={() => useEditorStore.getState().setPreviewMode('original')}>原片校对</button>
+        <button className={`btn ${previewMode === 'edited' ? 'primary' : 'secondary'}`} onClick={() => useEditorStore.getState().setPreviewMode('edited')}>成片预览</button>
+      </div>
     </div>
     <div className="transport">
       <div className="timecode"><b>{formatTime(playheadMs)}</b><span>/ {formatTime(media.durationMs)}</span></div>
