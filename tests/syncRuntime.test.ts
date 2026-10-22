@@ -8,6 +8,7 @@ import { exportMedia } from '../src/main/export/exportMedia'
 import { probeMedia } from '../src/main/ffprobe/probe'
 import { cancelTask } from '../src/main/ffmpeg/taskManager'
 import { previewPath } from '../src/main/ffmpeg/preview'
+import { generateWaveform } from '../src/main/ffmpeg/waveform'
 
 function ffmpeg(args: string[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
@@ -75,4 +76,32 @@ it('prepares exactly the selected audio track for multi-track preview', async ()
   for (let i = 0; i < pcm.length; i += 4) max = Math.max(max, Math.abs(pcm.readFloatLE(i)))
   expect(max).toBeGreaterThan(.05)
   expect(await previewPath(media, 2, join(dir, 'cache'))).toBe(selected)
+}, 30000)
+
+it('handles VFR HEVC video without audio and opposite-phase stereo audio', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'cutex-compat-'))
+  const videoPath = join(dir, 'vfr-hevc.mp4')
+  await ffmpeg(['-f', 'lavfi', '-i', 'testsrc2=s=160x90:r=25:d=4', '-vf', 'select=not(eq(mod(n\\,3)\\,0))',
+    '-fps_mode', 'vfr', '-c:v', 'libx265', '-x265-params', 'pools=2:frame-threads=2:log-level=error', '-an', videoPath])
+  const video = await probeMedia(videoPath)
+  for (const mode of ['fast', 'precise'] as const) {
+    const path = join(dir, `${mode}.mp4`)
+    await exportMedia({ taskId: `compat-${mode}`, inputPath: videoPath, outputPath: path, format: 'mp4', mode,
+      durationMs: video.durationMs, hasVideo: true, hasAudio: false,
+      keepRanges: [{ id: 'a', startMs: 200, endMs: 1200 }, { id: 'b', startMs: 2200, endMs: 3200 }] }, join(dir, `${mode}.log`), window)
+    const result = await probeMedia(path)
+    expect(result.hasAudio).toBe(false)
+    expect(Math.abs(result.durationMs - 2000)).toBeLessThanOrEqual(120)
+  }
+  const audioPath = join(dir, 'opposite.wav')
+  await ffmpeg(['-f', 'lavfi', '-i', 'aevalsrc=0.5*sin(2*PI*440*t)|-0.5*sin(2*PI*440*t):s=48000:d=2', audioPath])
+  const waveform = await generateWaveform({ path: audioPath, durationMs: 2000, audioStreamIndex: 0, points: 2000 }, join(dir, 'cache'))
+  expect(Math.max(...waveform.peaks)).toBeGreaterThan(.45)
+  expect(waveform.levels?.length).toBeGreaterThan(0)
+  expect(await generateWaveform({ path: audioPath, durationMs: 2000, audioStreamIndex: 0, points: 2000 }, join(dir, 'cache'))).toEqual(waveform)
+  const audioOut = join(dir, 'audio.mp3')
+  await exportMedia({ taskId: 'compat-audio', inputPath: audioPath, outputPath: audioOut, format: 'mp3', mode: 'fast',
+    durationMs: 2000, hasAudio: true, hasVideo: false, audioStreamIndex: 0,
+    keepRanges: [{ id: 'a', startMs: 100, endMs: 1000 }] }, join(dir, 'audio.log'), window)
+  expect((await probeMedia(audioOut)).hasVideo).toBe(false)
 }, 30000)

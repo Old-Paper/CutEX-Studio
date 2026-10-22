@@ -58,6 +58,10 @@ runtime('real FFmpeg processing', () => {
       })
       await runFfmpeg(args)
       expect((await stat(outputPath)).size).toBeGreaterThan(1_000)
+      const output = await probeMedia(outputPath)
+      expect(Math.abs(output.durationMs - 1600)).toBeLessThanOrEqual(120)
+      expect(output.hasAudio).toBe(true)
+      expect(output.hasVideo).toBe(['mp4', 'mov', 'mkv', 'webm'].includes(format))
     }
   }, 180_000)
 
