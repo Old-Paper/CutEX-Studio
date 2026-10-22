@@ -119,7 +119,7 @@ tests/
 ## FFmpeg 调用方案
 
 - FFprobe：`-print_format json -show_format -show_streams`，解析格式、视频流和所有音频流。
-- 静音检测：选择绝对流索引后使用不低于 `silencedetect=noise=-35dB:d=1.000` 的持续时间，从 stderr 解析开始/结束时间；1 秒及以下的静音和最终自动删除片段会被严格忽略。
+- 静音检测：选择绝对流索引后使用不低于 `silencedetect=noise=-35dB:d=1.000` 的持续时间，从 stderr 解析开始/结束时间；原始静音 ≤1 秒不自动裁剪，扣除前后保留量后只过滤空区间。
 - 精确导出：每个保留区间分别使用 `trim + setpts` 和 `atrim + asetpts`，最后 `concat`；支持 MP4、MOV、MKV、WebM、MP3、WAV、M4A，并为容器选择 H.264/AAC、VP9/Opus、MP3 或 PCM 编码。
 - 大量切点的复杂滤镜会写入临时脚本再交给 FFmpeg，避免超过 Windows 进程启动参数长度限制；任务结束后自动清理。
 - H.264 使用兼容性稳定的 x264 `veryfast` 软件预设；WebM 启用 VP9 行级多线程，避免默认硬件编码带来的显卡和驱动兼容问题。
@@ -130,7 +130,7 @@ tests/
 - Electron + React + TypeScript + Vite 工程、严格模式、ESLint、Vitest、electron-builder。
 - MP4/MOV/MKV/WebM/MP3/WAV/M4A 文件选择或整窗拖放导入，以及 FFprobe 元数据、多音轨选择。
 - 导入后自动使用当前节奏预设完成静音检测与粗剪，不需要额外点击分析按钮。
-- 静音检测参数、原始静音、建议删除和最终保留区间生成及全部边界修正；自动标记只保留超过 1 秒的静音删除片段。
+- 静音检测参数、原始静音、建议删除和最终保留区间生成及边界修正；1 秒过滤仅作用于原始静音，不改动保存过的手动片段。
 - 深色三栏编辑工作台、视频/音频预览、播放控制、时间显示和跳转。
 - FFmpeg PCM 真波形：2,400 个时间桶的峰值与 RMS，Canvas 高性能绘制并与时间轴精确对齐。
 - 快/中/慢三档节奏预设；中、慢档按素材真实帧率换算前后 4 帧和 8 帧。
