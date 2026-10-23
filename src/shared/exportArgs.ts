@@ -84,22 +84,23 @@ export function buildFastExportArgs(options: ExportOptions, concatListPath: stri
   if (!options.outputPath) throw new Error('尚未选择输出路径。')
 
   const outputDurationMs = options.keepRanges.reduce((sum, range) => sum + range.endMs - range.startMs, 0)
-  const args = ['-hide_banner', '-y', '-segment_time_metadata', '1', '-f', 'concat', '-safe', '0', '-i', concatListPath]
-  if (includeVideo) args.push('-map', '0:v:0', '-vf', 'select=concatdec_select,setpts=PTS-STARTPTS')
+  // concatdec_select compares frame PTS with demuxer metadata; preserve that clock.
+  const args = ['-hide_banner', '-y', '-copyts', '-segment_time_metadata', '1', '-f', 'concat', '-safe', '0', '-i', concatListPath]
+  if (includeVideo) args.push('-map', '0:v:0', '-vf', 'select=concatdec_select,setpts=PTS-STARTPTS', '-fps_mode', 'vfr')
   if (includeAudio) {
     const audioStreamIndex = options.audioStreamIndex ?? 0
-    args.push('-map', `0:${audioStreamIndex}`, '-af', `aselect=concatdec_select,asetpts=PTS-STARTPTS,apad=whole_dur=${seconds(outputDurationMs)},atrim=end=${seconds(outputDurationMs)}`)
+    args.push('-map', `0:${audioStreamIndex}`, '-af', `aselect=concatdec_select,asetpts=PTS-STARTPTS,aresample=async=1:min_hard_comp=0.001:first_pts=0,apad=whole_dur=${seconds(outputDurationMs)},atrim=end=${seconds(outputDurationMs)}`)
   }
   args.push('-max_muxing_queue_size', '2048')
   appendOutputArgs(args, options, includeVideo, includeAudio)
   return args
 }
 
-export function externalizeComplexFilter(args: string[], filterScriptPath: string): { args: string[]; filterGraph: string } {
+export function externalizeComplexFilter(args: string[], filterScriptPath: string, option = '-/filter_complex'): { args: string[]; filterGraph: string } {
   const filterIndex = args.indexOf('-filter_complex')
   const filterGraph = args[filterIndex + 1]
   if (filterIndex < 0 || !filterGraph) throw new Error('导出参数中缺少复杂滤镜。')
   const externalized = [...args]
-  externalized.splice(filterIndex, 2, '-filter_complex_script', filterScriptPath)
+  externalized.splice(filterIndex, 2, option, filterScriptPath)
   return { args: externalized, filterGraph }
 }

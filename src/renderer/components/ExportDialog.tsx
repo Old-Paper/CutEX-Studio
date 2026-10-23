@@ -60,7 +60,7 @@ export function ExportDialog(): JSX.Element {
           {encoders.map((encoder) => <button key={encoder.id} disabled={!encoder.available} className={acceleration === encoder.id ? 'active' : ''} onClick={() => setAcceleration(encoder.id)}><Zap size={17} /><span><b>{encoder.label}</b><small>{encoder.available ? '已通过真实编码检测' : '当前设备不可用'}</small></span></button>)}
         </div> : <div className="acceleration-note"><Cpu size={15} /><span>{selectedInfo?.kind === 'audio' ? '音频导出不需要 GPU，将使用专用音频编码器。' : 'WebM 使用 VP9 多线程软件编码，H.264 GPU 加速不适用于此格式。'}</span></div>}
       </div>}
-      <div className="export-dialog-foot"><span>{mode === 'fast' ? '快速模式按音视频帧边界裁切；失败会自动切换高精度模式。' : '高精度模式使用逐段毫秒裁切，适合最终母版。'}</span><button className="btn primary" disabled={!selectedInfo} onClick={() => selectedInfo && void exportMedia(selectedInfo.id, effectiveAcceleration, mode)}>开始导出</button></div>
+      <div className="export-dialog-foot"><span>{mode === 'fast' ? '快速模式按帧边界裁切；时间戳兼容性错误才回退。已有文件不覆盖。' : '高精度模式逐段裁切；输出校验后交付，已有文件不覆盖。'}</span><button className="btn primary" disabled={!selectedInfo} onClick={() => selectedInfo && void exportMedia(selectedInfo.id, effectiveAcceleration, mode)}>开始导出</button></div>
     </div>
   </div>
 }

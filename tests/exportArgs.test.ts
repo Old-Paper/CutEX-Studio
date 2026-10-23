@@ -67,7 +67,7 @@ describe('buildExportArgs', () => {
     const scriptPath = 'C:\\Temp\\cutex-filter.txt'
     const result = externalizeComplexFilter(inline, scriptPath)
     expect(result.filterGraph).toContain('concat=n=400:v=1:a=1[vout][aout]')
-    expect(result.args).toContain('-filter_complex_script')
+    expect(result.args).toContain('-/filter_complex')
     expect(result.args).toContain(scriptPath)
     expect(result.args).not.toContain(result.filterGraph)
     expect(result.args.join(' ').length).toBeLessThan(1_000)
@@ -78,6 +78,8 @@ describe('buildExportArgs', () => {
     expect(list).toContain("file 'C:/素材 文件/配音.mp4'")
     expect(list).toContain('inpoint 2.000')
     expect(args).toContain('-segment_time_metadata')
+    expect(args).toContain('-copyts')
+    expect(args.join(' ')).toContain('min_hard_comp=0.001')
     expect(args).toContain('select=concatdec_select,setpts=PTS-STARTPTS')
     expect(args).toContain('h264_nvenc')
     expect(args.join(' ')).not.toContain('trim=start=')

@@ -1,13 +1,14 @@
-import { app, BrowserWindow, protocol } from 'electron'
+import { app, BrowserWindow, dialog, protocol } from 'electron'
 import { extname, join } from 'node:path'
 import { createReadStream } from 'node:fs'
 import { stat, writeFile } from 'node:fs/promises'
 import { Readable } from 'node:stream'
 import { registerIpc } from './ipc/register'
 import { parseByteRange } from '../shared/mediaRange'
+import { cancelAllTasks } from './ffmpeg/taskManager'
 
 // Keep using the legacy data folder so recent projects and logs survive the product rename.
-app.setPath('userData', join(app.getPath('appData'), 'dubcut-studio'))
+app.setPath('userData', process.env.CUTEX_USER_DATA || join(app.getPath('appData'), 'dubcut-studio'))
 app.setName('CutEX Studio')
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'local-media', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true, corsEnabled: true } }])
@@ -24,6 +25,15 @@ function createWindow(): void {
     }
   })
   registerIpc(window)
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  window.webContents.on('will-navigate', (event) => event.preventDefault())
+  window.webContents.session.setPermissionRequestHandler((_contents, _permission, callback) => callback(false))
+  window.webContents.on('will-prevent-unload', (event) => {
+    const answer = dialog.showMessageBoxSync(window, { type: 'warning', title: '尚有未保存的修改或正在执行的任务',
+      message: '关闭前请先保存项目并等待任务完成。', detail: '退出会终止当前任务；未保存的剪辑可在下次启动时从最近的恢复快照恢复。',
+      buttons: ['继续编辑', '仍然退出'], defaultId: 0, cancelId: 0 })
+    if (answer === 1) event.preventDefault()
+  })
   const capturePath = process.env.CUTEX_CAPTURE_PATH ?? process.env.DUBCUT_CAPTURE_PATH
   if (capturePath) window.webContents.once('did-finish-load', () => {
     setTimeout(() => void window.webContents.capturePage().then((image) => writeFile(capturePath, image.toPNG())).finally(() => app.quit()), 1200)
@@ -65,3 +75,4 @@ app.whenReady().then(() => {
 })
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit() })
+app.on('before-quit', cancelAllTasks)

@@ -7,6 +7,7 @@ export default tseslint.config(
   { ignores: ['dist', 'release', 'coverage'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
+  { files: ['scripts/*.mjs'], languageOptions: { globals: { process: 'readonly', console: 'readonly', document: 'readonly' } } },
   {
     files: ['src/renderer/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks, 'react-refresh': reactRefresh },

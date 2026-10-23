@@ -1,11 +1,12 @@
 import { useEffect } from 'react'
 import { useEditorStore } from '../stores/editorStore'
 
-export type ShortcutAction = 'play' | 'toggleCurrent' | 'delete' | 'selectAll' | 'invert' | 'undo' | 'redo' | 'split' | 'trimLeft' | 'trimRight' | 'stepBack' | 'stepForward' | 'zoomIn' | 'zoomOut' | 'home' | 'end'
+export type ShortcutAction = 'save' | 'play' | 'toggleCurrent' | 'delete' | 'selectAll' | 'invert' | 'undo' | 'redo' | 'split' | 'trimLeft' | 'trimRight' | 'stepBack' | 'stepForward' | 'zoomIn' | 'zoomOut' | 'home' | 'end'
 
 export function shortcutFromEvent(event: Pick<KeyboardEvent, 'key' | 'ctrlKey' | 'metaKey' | 'shiftKey'>): ShortcutAction | null {
   const key = event.key.toLowerCase()
   const command = event.ctrlKey || event.metaKey
+  if (command && key === 's') return 'save'
   if (command && key === 'a') return 'selectAll'
   if (command && key === 'i') return 'invert'
   if (command && key === 'z') return event.shiftKey ? 'redo' : 'undo'
@@ -33,9 +34,11 @@ export function useKeyboardShortcuts(): void {
       if (!action) return
       event.preventDefault()
       const state = useEditorStore.getState()
+      if (state.isReplacing || state.isExportDialogOpen || (event.repeat && (action === 'play' || action === 'toggleCurrent'))) return
       const step = event.shiftKey ? 100 : 10
       const duration = state.media?.durationMs ?? 0
       const actions: Record<ShortcutAction, () => void> = {
+        save: () => { void state.saveProject() },
         play: state.togglePlayback,
         toggleCurrent: state.toggleCurrentSegment,
         delete: () => state.setSelectedEnabled(true),

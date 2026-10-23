@@ -17,9 +17,9 @@ describe('silenceToDeletionRanges', () => {
     const cuts = silenceToDeletionRanges([range(100, 1099), range(2000, 3000), range(4000, 5001)], 6000, custom)
     expect(cuts.map(({ startMs, endMs }) => [startMs, endMs])).toEqual([[4000, 5001]])
   })
-  it('ignores an automatic cut that becomes one second after padding', () => {
+  it('applies the one-second rule to raw silence, not the padded deletion', () => {
     const custom = { ...params, keepBeforeMs: 100, keepAfterMs: 100, minimumKeepMs: 0, mergeGapMs: 0 }
-    expect(silenceToDeletionRanges([range(1000, 2200)], 4000, custom)).toEqual([])
+    expect(silenceToDeletionRanges([range(1000, 2200)], 4000, custom)[0]).toMatchObject({ startMs: 1100, endMs: 2100 })
     expect(silenceToDeletionRanges([range(1000, 2201)], 4000, custom)[0]).toMatchObject({ startMs: 1100, endMs: 2101 })
   })
   it('does not preserve padding at the beginning of media', () => {

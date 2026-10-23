@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 import type { DesktopApi, DetectionParameters, ExportOptions, MediaInfo, ProjectData, TaskProgress } from '../shared/types'
 
 const api: DesktopApi = {
+  environmentStatus: () => ipcRenderer.invoke('environment:status'),
+  previewPath: (media, stream) => ipcRenderer.invoke('media:preview', media, stream),
+  confirmReplace: () => ipcRenderer.invoke('project:confirm-replace'),
+  saveRecovery: (project) => ipcRenderer.invoke('project:recovery-save', project),
+  recoverProject: () => ipcRenderer.invoke('project:recover'),
   selectMedia: () => ipcRenderer.invoke('media:select') as Promise<MediaInfo | null>,
   importDroppedFile: (file: unknown) => {
     const filePath = webUtils.getPathForFile(file as Parameters<typeof webUtils.getPathForFile>[0])

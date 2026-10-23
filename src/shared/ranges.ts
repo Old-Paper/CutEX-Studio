@@ -58,7 +58,7 @@ export function silenceToDeletionRanges(
       startMs: silence.startMs === 0 ? 0 : silence.startMs + Math.max(0, integer(parameters.keepAfterMs)),
       endMs: silence.endMs === duration ? duration : silence.endMs - Math.max(0, integer(parameters.keepBeforeMs))
     }))
-    .filter((range) => range.endMs - range.startMs > MINIMUM_AUTOMATIC_SILENCE_MS)
+    .filter((range) => range.endMs > range.startMs)
 
   let merged = mergeRanges(padded, parameters.mergeGapMs, duration)
   if (parameters.minimumKeepMs > 0 && merged.length > 1) {
@@ -76,6 +76,35 @@ export function silenceToDeletionRanges(
 
 export function dropShortDetectedDeletions(ranges: DeletionRange[]): DeletionRange[] {
   return ranges.filter((range) => range.source !== 'detected' || range.endMs - range.startMs > MINIMUM_AUTOMATIC_SILENCE_MS)
+}
+
+export function markManual(range: DeletionRange, change: Partial<DeletionRange> = {}): DeletionRange {
+  const next = { ...range, ...change, source: 'manual' as const }
+  return { ...next,
+    overrideStartMs: Math.min(range.overrideStartMs ?? range.startMs, next.startMs),
+    overrideEndMs: Math.max(range.overrideEndMs ?? range.endMs, next.endMs)
+  }
+}
+
+/** Manual decisions win over regenerated suggestions, including restored edges. */
+export function preserveManualEdits(detected: DeletionRange[], previous: DeletionRange[]): DeletionRange[] {
+  const manual = previous.filter((range) => range.source === 'manual')
+  const automatic = detected.flatMap((range) => {
+    let pieces = [range]
+    for (const override of manual) {
+      const start = override.overrideStartMs ?? override.startMs
+      const end = override.overrideEndMs ?? override.endMs
+      pieces = pieces.flatMap((piece) => {
+        if (end <= piece.startMs || start >= piece.endMs) return [piece]
+        const result: DeletionRange[] = []
+        if (start > piece.startMs) result.push({ ...piece, id: createRangeId('cut'), endMs: start })
+        if (end < piece.endMs) result.push({ ...piece, id: createRangeId('cut'), startMs: end })
+        return result
+      })
+    }
+    return pieces
+  })
+  return sortRanges([...automatic, ...manual])
 }
 
 export function invertRangeSelection(allIds: string[], selectedIds: string[]): string[] {

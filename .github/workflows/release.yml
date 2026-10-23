@@ -17,22 +17,35 @@ jobs:
           fetch-depth: 0
       - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6
         with:
-          version: 9
+          version: 9.15.9
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Verify version and media tools
+        shell: pwsh
+        run: |
+          $version = (Get-Content package.json | ConvertFrom-Json).version
+          if ('${{ github.ref_name }}' -ne "v$version") { throw 'Tag does not match package version' }
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) { choco install ffmpeg --yes --no-progress }
+          ffmpeg -version
+          ffprobe -version
       - run: pnpm test
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm package
+      - name: Smoke test packaged application
+        shell: pwsh
+        run: |
+          $env:CUTEX_SMOKE_EXE = Join-Path $PWD 'release/win-unpacked/CutEX Studio.exe'
+          pnpm smoke
       - name: Create source archive
         shell: pwsh
         run: |
           $version = '${{ github.ref_name }}' -replace '^v', ''
           git archive --format=zip --output="release/CutEX-Studio-$version-source.zip" HEAD
-      - name: Publish GitHub Release
+      - name: Create immutable draft release for verification
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
@@ -40,14 +53,15 @@ jobs:
           $version = '${{ github.ref_name }}' -replace '^v', ''
           gh release view '${{ github.ref_name }}' --json tagName 2>$null
           if ($LASTEXITCODE -eq 0) {
-            gh release upload '${{ github.ref_name }}' `
-              "release/CutEX-Studio-$version-Windows.exe" `
-              "release/CutEX-Studio-$version-source.zip" `
-              --clobber
+            throw 'Release already exists; publish a new version instead of replacing assets.'
           } else {
+            $hashes = Get-FileHash "release/CutEX-Studio-$version-Windows.exe", "release/CutEX-Studio-$version-source.zip" -Algorithm SHA256
+            $hashes | ForEach-Object { "$($_.Hash.ToLower())  $(Split-Path $_.Path -Leaf)" } | Set-Content release/SHA256SUMS.txt
             gh release create '${{ github.ref_name }}' `
               "release/CutEX-Studio-$version-Windows.exe" `
               "release/CutEX-Studio-$version-source.zip" `
+              "release/SHA256SUMS.txt" `
               --title "CutEX Studio $version" `
+              --draft `
               --generate-notes
           }
